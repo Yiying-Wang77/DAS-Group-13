@@ -1,0 +1,16 @@
+---
+title: "DAS Project 2 - Group 13"
+format: html
+---
+
+# Introduction
+
+This project analyses the Coffee Quality Database dataset.
+
+# Data Cleaning
+
+# Exploratory Data Analysis
+
+# Modelling
+
+# Conclusion
