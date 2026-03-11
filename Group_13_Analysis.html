@@ -213,7 +213,7 @@ $ Qualityclass         &lt;chr&gt; "Poor", "Good", "Good", "Poor", "Good", "Good
 </div>
 </div>
 </div>
-<p>This bar chart shows the number of coffee batches classified as Good and Poor. The response variable appears reasonably balanced across the two classes, which is useful for the later logistic GLM because it reduces the risk that one class dominates the analysis.</p>
+<p>This bar chart shows the number of coffee batches classified as Good and Poor. The two classes are relatively balanced, although the number of Good batches is slightly higher than the number of Poor batches. This suggests that class imbalance is unlikely to be a major issue in the later logistic GLM, since neither category overwhelmingly dominates the dataset.</p>
 </section>
 <section id="aroma-by-quality-class" class="level2">
 <h2 class="anchored" data-anchor-id="aroma-by-quality-class">Aroma by quality class</h2>
@@ -233,7 +233,7 @@ $ Qualityclass         &lt;chr&gt; "Poor", "Good", "Good", "Poor", "Good", "Good
 </div>
 </div>
 </div>
-<p>This histogram compares aroma scores across the two quality classes. Good coffee batches appear to have slightly higher aroma scores than Poor batches, suggesting that aroma may be a useful predictor of coffee quality classification.</p>
+<p>This histogram compares aroma scores across the two quality classes. The distribution for Good coffee is shifted slightly to the right, indicating that Good batches tend to have somewhat higher aroma scores than Poor batches. Although the two distributions overlap considerably, aroma still appears to contain useful information for distinguishing between the two classes and is therefore a plausible predictor in the later GLM.</p>
 </section>
 <section id="flavor-by-quality-class" class="level2">
 <h2 class="anchored" data-anchor-id="flavor-by-quality-class">Flavor by quality class</h2>
@@ -253,7 +253,7 @@ $ Qualityclass         &lt;chr&gt; "Poor", "Good", "Good", "Poor", "Good", "Good
 </div>
 </div>
 </div>
-<p>This plot compares flavor scores between Good and Poor coffee batches. The distributions suggest that higher flavor scores are associated with Good-quality coffee, indicating that flavor may be an important predictor in the later GLM.</p>
+<p>This plot compares flavor scores between Good and Poor coffee batches. Similar to aroma, the Good group appears to have a slightly higher concentration of observations at the upper end of the flavor scale. While there is substantial overlap between the two groups, the pattern suggests that higher flavor scores are associated with a greater probability of a batch being classified as Good, so flavor is likely to be an important explanatory variable.</p>
 </section>
 <section id="acidity-by-quality-class" class="level2">
 <h2 class="anchored" data-anchor-id="acidity-by-quality-class">Acidity by quality class</h2>
@@ -273,7 +273,7 @@ $ Qualityclass         &lt;chr&gt; "Poor", "Good", "Good", "Poor", "Good", "Good
 </div>
 </div>
 </div>
-<p>This histogram shows the distribution of acidity scores by quality class. The two groups appear to differ somewhat, suggesting that acidity may also help explain variation in coffee quality classification.</p>
+<p>This histogram shows the distribution of acidity scores by quality class. The Good group appears to be centred at slightly higher acidity values, although the difference is less pronounced than for aroma or flavor. This suggests that acidity may still contribute to explaining coffee quality classification, but its effect may be weaker than some of the other sensory variables.</p>
 </section>
 <section id="category-two-defects-by-quality-class" class="level2">
 <h2 class="anchored" data-anchor-id="category-two-defects-by-quality-class">Category two defects by quality class</h2>
@@ -314,7 +314,7 @@ $ Qualityclass         &lt;chr&gt; "Poor", "Good", "Good", "Poor", "Good", "Good
 </div>
 </div>
 </div>
-<p>This scatterplot shows the relationship between altitude and aroma score, with points coloured by quality class. The association does not appear strongly linear, but altitude may still contribute some additional information alongside sensory variables. This suggests that altitude could be considered as a candidate predictor in the later GLM, although its effect may be weaker than variables such as aroma or flavor.</p>
+<p>This scatterplot shows the relationship between altitude and aroma score, with points coloured by quality class. Most observations are concentrated within a similar altitude range, and the association between altitude and aroma does not appear strongly linear. However, Good batches tend to cluster at slightly higher aroma values across much of the altitude range. This suggests that altitude may provide some additional information, although its role is likely to be weaker and less direct than that of the sensory variables.</p>
 </section>
 <section id="correlation-analysis" class="level2">
 <h2 class="anchored" data-anchor-id="correlation-analysis">Correlation analysis</h2>
@@ -337,7 +337,8 @@ altitude_mean_meters         -0.008705905
 category_two_defects          1.000000000</code></pre>
 </div>
 </div>
-<p>The correlation matrix summarises the relationships among the main numeric variables. Sensory variables such as aroma, flavor and acidity are moderately correlated with one another, while altitude and defect counts appear to capture different aspects of coffee production and quality. This is useful for identifying suitable candidate predictors for the later GLM and for recognising that some sensory variables may contain overlapping information.This also suggests that care may be needed when including multiple sensory variables in the same GLM, as some predictors may contain overlapping information.</p>
+<p>The correlation matrix summarises the relationships among the main numeric variables. Aroma, flavor and acidity are moderately to strongly positively correlated, which is expected because these sensory measures reflect related aspects of coffee quality. By contrast, altitude and category two defects show much weaker relationships with the sensory variables, suggesting that they may capture different dimensions of coffee production and quality. This is useful for the later GLM, as it indicates that some predictors may contain overlapping information while others may contribute more distinct explanatory value.</p>
+<p>Overall, the exploratory analysis suggests that sensory variables, particularly aroma, flavor and acidity, differ between coffee batches classified as Good and Poor. Among these, aroma and flavor appear to show the clearest separation, while acidity shows a weaker but still noticeable difference. In addition, higher defect counts are more common among Poor batches, and altitude may provide some additional contextual information even though its relationship with quality appears less direct. These findings suggest that both sensory and production-related variables should be considered in the later GLM modelling the probability that a coffee batch is classified as Good rather than Poor.</p>
 </section>
 </section>
 <section id="modelling" class="level1">
