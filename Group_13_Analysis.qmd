@@ -2,10 +2,11 @@
 title: "DAS Project 2 - Group 13"
 format: html
 execute:
-  echo: false
+  echo: true
   warning: false
   message: false
 ---
+
 
 # Introduction
 
@@ -14,13 +15,13 @@ This project analyses data from the Coffee Quality Database (CQD), which contain
 To answer this question, the dataset is first cleaned and explored using descriptive summaries and visualisations. A generalised linear model (GLM) is then used to examine how these variables are associated with coffee quality classification.
 
 # Data Cleaning
-```{r, include=FALSE}
+```{r}
 library(tidyverse)
 
 coffee <- read_csv("data/dataset13.csv", show_col_types = FALSE)
 ```
 
-```{r, include=FALSE}
+```{r}
 glimpse(coffee)
 summary(coffee)
 colSums(is.na(coffee))
@@ -37,7 +38,7 @@ coffee <- coffee %>%
 ```
 
 The dataset was inspected using `glimpse()` and `summary()` to understand the structure and distributions of the variables. Missing values were checked using `colSums(is.na())`, and duplicate rows were identified using `duplicated()`. Duplicate rows were removed to improve data quality before analysis.
-```{r, include=FALSE}
+```{r}
 coffee_clean <- coffee %>%
   filter(!is.na(country_of_origin),
          !is.na(aroma),
@@ -51,7 +52,7 @@ coffee_clean <- coffee %>%
          altitude_mean_meters < 3000)
 ```
 The dataset also contained missing values and unrealistic values in the altitude variable. To improve data quality, rows with missing values in key variables were removed. In addition, only observations with altitude between 0 and 3000 meters were retained, as extremely large altitude values are not plausible for coffee-growing regions. After cleaning, the number of observations was reduced from 1144 to 919.
-```{r,include=FALSE}
+```{r}
 nrow(coffee)
 nrow(coffee_clean)
 ```
