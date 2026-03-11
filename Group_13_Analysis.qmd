@@ -2,7 +2,7 @@
 title: "DAS Project 2 - Group 13"
 format: html
 execute:
-  echo: false
+  echo: true
   warning: false
   message: false
 ---
