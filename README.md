@@ -19,14 +19,10 @@ What influence do different features of coffee have on whether the quality of a 
 - `README.md` — project guide
   
 ## How to run the analysis (Quarto)
-### Option A: RStudio
+### Option: RStudio
 1. Open `Group_13_Analysis.qmd` in RStudio
 2. Install packages (if prompted)
 3. Click **Render**
-
-### Option B: Terminal
-```bash
-quarto render Group_13_Analysis.qmd
 
 ## Team & contributions
 - **Yiying Wang**: repository setup, README maintenance
