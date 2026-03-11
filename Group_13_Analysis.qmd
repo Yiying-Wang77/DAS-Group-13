@@ -1,6 +1,8 @@
 ---
 title: "DAS Project 2 - Group 13"
-format: html
+format:
+  html:
+    embed-resources: true
 execute:
   echo: true
   warning: false
