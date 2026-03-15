@@ -9,7 +9,6 @@ execute:
   message: false
 ---
 
-
 # Introduction
 
 This project analyses data from the Coffee Quality Database (CQD), which contains information on coffee batches and their quality-related characteristics. The aim is to investigate which features of coffee, such as aroma, flavor, acidity, defects and altitude, influence whether a batch is classified as Good or Poor.
@@ -17,6 +16,7 @@ This project analyses data from the Coffee Quality Database (CQD), which contain
 To answer this question, the dataset is first cleaned and explored using descriptive summaries and visualisations. A generalised linear model (GLM) is then used to examine how these variables are associated with coffee quality classification.
 
 # Data Cleaning
+
 ```{r}
 library(tidyverse)
 
@@ -40,6 +40,7 @@ coffee <- coffee %>%
 ```
 
 The dataset was inspected using `glimpse()` and `summary()` to understand the structure and distributions of the variables. Missing values were checked using `colSums(is.na())`, and duplicate rows were identified using `duplicated()`. Duplicate rows were removed to improve data quality before analysis.
+
 ```{r}
 coffee_clean <- coffee %>%
   filter(!is.na(country_of_origin),
@@ -53,14 +54,18 @@ coffee_clean <- coffee %>%
   filter(altitude_mean_meters > 0,
          altitude_mean_meters < 3000)
 ```
+
 The dataset also contained missing values and unrealistic values in the altitude variable. To improve data quality, rows with missing values in key variables were removed. In addition, only observations with altitude between 0 and 3000 meters were retained, as extremely large altitude values are not plausible for coffee-growing regions. After cleaning, the number of observations was reduced from 1144 to 919.
+
 ```{r}
 nrow(coffee)
 nrow(coffee_clean)
 ```
 
 # Exploratory Data Analysis
+
 ## Distribution of quality class
+
 ```{r}
 coffee_clean %>%
   count(Qualityclass) %>%
@@ -72,9 +77,11 @@ coffee_clean %>%
     y = "Count"
   )
 ```
+
 This bar chart shows the number of coffee batches classified as Good and Poor. The two classes are relatively balanced, although the number of Good batches is slightly higher than the number of Poor batches. This suggests that class imbalance is unlikely to be a major issue in the later logistic GLM, since neither category overwhelmingly dominates the dataset.
 
 ## Aroma by quality class
+
 ```{r}
 ggplot(coffee_clean, aes(x = aroma, fill = Qualityclass)) +
   geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
@@ -84,9 +91,11 @@ ggplot(coffee_clean, aes(x = aroma, fill = Qualityclass)) +
     y = "Frequency"
   )
 ```
+
 This histogram compares aroma scores across the two quality classes. The distribution for Good coffee is shifted slightly to the right, indicating that Good batches tend to have somewhat higher aroma scores than Poor batches. Although the two distributions overlap considerably, aroma still appears to contain useful information for distinguishing between the two classes and is therefore a plausible predictor in the later GLM.
 
 ## Flavor by quality class
+
 ```{r}
 ggplot(coffee_clean, aes(x = flavor, fill = Qualityclass)) +
   geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
@@ -96,9 +105,11 @@ ggplot(coffee_clean, aes(x = flavor, fill = Qualityclass)) +
     y = "Frequency"
   )
 ```
+
 This plot compares flavor scores between Good and Poor coffee batches. Similar to aroma, the Good group appears to have a slightly higher concentration of observations at the upper end of the flavor scale. While there is substantial overlap between the two groups, the pattern suggests that higher flavor scores are associated with a greater probability of a batch being classified as Good, so flavor is likely to be an important explanatory variable.
 
 ## Acidity by quality class
+
 ```{r}
 ggplot(coffee_clean, aes(x = acidity, fill = Qualityclass)) +
   geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
@@ -108,9 +119,11 @@ ggplot(coffee_clean, aes(x = acidity, fill = Qualityclass)) +
     y = "Frequency"
   )
 ```
+
 This histogram shows the distribution of acidity scores by quality class. The Good group appears to be centred at slightly higher acidity values, although the difference is less pronounced than for aroma or flavor. This suggests that acidity may still contribute to explaining coffee quality classification, but its effect may be weaker than some of the other sensory variables.
 
 ## Category two defects by quality class
+
 ```{r}
 ggplot(coffee_clean, aes(x = Qualityclass, y = category_two_defects, fill = Qualityclass)) +
   geom_boxplot() +
@@ -121,9 +134,11 @@ ggplot(coffee_clean, aes(x = Qualityclass, y = category_two_defects, fill = Qual
   ) +
   theme(legend.position = "none")
 ```
+
 This boxplot compares the distribution of category two defects between coffee batches classified as Good and Poor. The Poor group appears to have a slightly higher median number of defects and greater variability than the Good group. There are also more extreme values in the Poor group. This suggests that category two defects may be associated with coffee quality classification and should be considered as a candidate predictor in the later GLM.
 
 ## Altitude and aroma
+
 ```{r}
 ggplot(coffee_clean, aes(x = altitude_mean_meters, y = aroma, color = Qualityclass)) +
   geom_point(alpha = 0.7) +
@@ -133,8 +148,8 @@ ggplot(coffee_clean, aes(x = altitude_mean_meters, y = aroma, color = Qualitycla
     y = "Aroma Score"
   )
 ```
-This scatterplot shows the relationship between altitude and aroma score, with points coloured by quality class. Most observations are concentrated within a similar altitude range, and the association between altitude and aroma does not appear strongly linear. However, Good batches tend to cluster at slightly higher aroma values across much of the altitude range. This suggests that altitude may provide some additional information, although its role is likely to be weaker and less direct than that of the sensory variables.
 
+This scatterplot shows the relationship between altitude and aroma score, with points coloured by quality class. Most observations are concentrated within a similar altitude range, and the association between altitude and aroma does not appear strongly linear. However, Good batches tend to cluster at slightly higher aroma values across much of the altitude range. This suggests that altitude may provide some additional information, although its role is likely to be weaker and less direct than that of the sensory variables.
 
 ## Correlation analysis
 
@@ -143,10 +158,106 @@ coffee_clean %>%
   select(aroma, flavor, acidity, altitude_mean_meters, category_two_defects) %>%
   cor(use = "complete.obs")
 ```
+
 The correlation matrix summarises the relationships among the main numeric variables. Aroma, flavor and acidity are moderately to strongly positively correlated, which is expected because these sensory measures reflect related aspects of coffee quality. By contrast, altitude and category two defects show much weaker relationships with the sensory variables, suggesting that they may capture different dimensions of coffee production and quality. This is useful for the later GLM, as it indicates that some predictors may contain overlapping information while others may contribute more distinct explanatory value.
 
 Overall, the exploratory analysis suggests that sensory variables, particularly aroma, flavor and acidity, differ between coffee batches classified as Good and Poor. Among these, aroma and flavor appear to show the clearest separation, while acidity shows a weaker but still noticeable difference. In addition, higher defect counts are more common among Poor batches, and altitude may provide some additional contextual information even though its relationship with quality appears less direct. These findings suggest that both sensory and production-related variables should be considered in the later GLM modelling the probability that a coffee batch is classified as Good rather than Poor.
 
 # Modelling
 
+## Model Selection: Logistic Regression (GLM)
+
+We employed a Generalized Linear Model (GLM) with a logit link function Because the response variable, Qualityclass, is binary (Good versus Poor), a binomial Generalized Linear Model with a logit link was used. This model estimates how coffee characteristics are associated with the probability that a batch is classified as Good.
+
+```{r}
+#| label: glm-fitting
+library(caret)
+library(pROC)
+library(car)
+library(broom)
+
+# Ensure the baseline is set correctly
+coffee_clean$Qualityclass <- factor(coffee_clean$Qualityclass, levels = c("Poor", "Good"))
+
+model_final <- glm(Qualityclass ~ aroma + flavor + acidity + 
+                   category_two_defects + altitude_mean_meters, 
+                   data = coffee_clean, 
+                   family = binomial)
+
+summary(model_final)
+```
+
+Significant Predictors and DirectionBased on the summary output, we identify the followings:
+
+-   Significant Predictors: The model results show that aroma, flavor, and acidity are all statistically significant positive predictors of being classified as Good($p < 0.05$), indicating that they are the primary drivers of quality classification. Altitude also has a positive and significant association, although its effect size per meter is relatively small.
+
+-   Direction of Effect: The coefficients for flavor and aroma are positive, suggesting that as these sensory scores increase, the probability of the batch being classified as "Good" also increases.
+
+-   The Role of Defects: Although exploratory analysis showed that "Poor" batches had more defects, the GLM shows that category_two_defects is not a significant predictor ($p \approx 0.99$). This suggests that once sensory attributes like flavor are accounted for, physical defects do not provide additional unique information for predicting quality.
+
+### Odds Ratios
+
+```{r}
+#| label: odds-ratios
+or_table <- tidy(model_final, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    estimate = round(estimate, 3),
+    conf.low = round(conf.low, 3),
+    conf.high = round(conf.high, 3),
+    p.value = round(p.value, 4)
+  ) %>%
+  rename(
+    Predictor = term,
+    Odds_Ratio = estimate,
+    CI_Lower = conf.low,
+    CI_Upper = conf.high,
+    P_value = p.value
+  )
+
+or_table
+```
+
+To aid interpretation, the coefficients were exponentiated to obtain odds ratios. The results show that aroma, flavor, and acidity all have strong positive associations with the probability of a coffee batch being classified as Good. Among these predictors, flavor has the largest estimated odds ratio, suggesting that it is the strongest predictor in the final model.
+
+By contrast, category two defects has an odds ratio close to 1 and is not statistically significant, indicating that after accounting for the sensory variables, defects do not provide substantial additional explanatory value. Altitude has a positive and statistically significant association, although its odds ratio is close to 1 because the variable is measured in meters, so the effect per unit is small.
+
+### Multicollinearity check
+
+```{r}
+#| label: model-performance
+
+vif(model_final)
+```
+
+To assess whether multicollinearity might affect the stability of the logistic regression estimates, Variance Inflation Factors (VIFs) were calculated for all predictors. The VIF values are all very close to 1, indicating that there is little evidence of problematic multicollinearity in the final model.
+
+Although some of the sensory variables, such as aroma, flavor, and acidity, are conceptually related and showed moderate positive correlations during the exploratory analysis, these relationships do not appear strong enough to cause serious instability in the coefficient estimates. This suggests that the predictors each contribute distinct information and that the regression coefficients can be interpreted with reasonable confidence.
+
+### Performance Evaluation : ROC Curve
+
+#### Area Under the Curve (AUC)
+
+```{r}
+predicted_probs <- predict(model_final, type = "response")
+roc_obj <- roc(coffee_clean$Qualityclass, predicted_probs)
+plot(roc_obj, col = "blue", lwd = 2, 
+     main = paste("ROC Curve (AUC =", round(auc(roc_obj), 3), ")"))
+
+```
+
+Model performance was evaluated using the Receiver Operating Characteristic (ROC) curve and the Area Under the Curve (AUC). The ROC curve assesses the model’s ability to distinguish between coffee batches classified as Good and Poor across a range of classification thresholds.
+
+The AUC value of 0.949 indicates excellent discriminatory performance on the observed sample. In practical terms, this means that the fitted model is highly effective at assigning higher predicted probabilities to Good batches than to Poor batches. Therefore, the final logistic regression model not only identifies statistically significant predictors, but also performs very well as a classification tool.
+
 # Conclusion
+
+Our analysis of the Coffee Quality Database suggests that sensory characteristics are the strongest predictors of whether a coffee batch is classified as Good or Poor.
+
+First, aroma, flavor, and acidity all show significant positive associations with the probability of being classified as Good. Among these variables, flavor appears to have the strongest effect, indicating that sensory quality plays a central role in coffee classification.
+
+Second, altitude also has a positive and statistically significant association with quality, although its effect per meter is relatively small. In contrast, category two defects is not statistically significant in the final model, suggesting that once sensory variables are taken into account, defects do not provide substantial additional explanatory value.
+
+Finally, the diagnostic results suggest that the model is both stable and effective. The VIF values are all close to 1, indicating little evidence of problematic multicollinearity, and the AUC value of 0.949 shows that the model has excellent discriminatory performance on this sample.
+
+Overall, the results suggest that coffee quality classification is driven primarily by sensory attributes, while production-related variables play a more limited role in the final model.
