@@ -9,7 +9,6 @@ execute:
   message: false
 ---
 
-
 # Introduction
 
 This project analyses data from the Coffee Quality Database (CQD), which contains information on coffee batches and their quality-related characteristics. The aim is to investigate which features of coffee, such as aroma, flavor, acidity, defects and altitude, influence whether a batch is classified as Good or Poor.
@@ -17,6 +16,7 @@ This project analyses data from the Coffee Quality Database (CQD), which contain
 To answer this question, the dataset is first cleaned and explored using descriptive summaries and visualisations. A generalised linear model (GLM) is then used to examine how these variables are associated with coffee quality classification.
 
 # Data Cleaning
+
 ```{r}
 library(tidyverse)
 
@@ -40,6 +40,7 @@ coffee <- coffee %>%
 ```
 
 The dataset was inspected using `glimpse()` and `summary()` to understand the structure and distributions of the variables. Missing values were checked using `colSums(is.na())`, and duplicate rows were identified using `duplicated()`. Duplicate rows were removed to improve data quality before analysis.
+
 ```{r}
 coffee_clean <- coffee %>%
   filter(!is.na(country_of_origin),
@@ -48,104 +49,138 @@ coffee_clean <- coffee %>%
          !is.na(acidity),
          !is.na(category_two_defects),
          !is.na(altitude_mean_meters),
-         !is.na(harvested),
          !is.na(Qualityclass)) %>%
+#Handling Outliers
   filter(altitude_mean_meters > 0,
-         altitude_mean_meters < 3000)
+         altitude_mean_meters < 3000,
+         aroma > 0,   
+         flavor > 0,  
+         acidity > 0) %>% 
+#Altitude Binning & Log Transformation
+  mutate(
+    altitude_category = case_when(
+      altitude_mean_meters < 1250 ~ "Low",
+      altitude_mean_meters >= 1250 & altitude_mean_meters <= 1500 ~ "Medium",
+      altitude_mean_meters > 1500 ~ "High"
+    ),
+    altitude_category = factor(altitude_category, levels = c("Low", "Medium", "High")),
+    log_defects = log(category_two_defects + 1)
+  )
 ```
-The dataset also contained missing values and unrealistic values in the altitude variable. To improve data quality, rows with missing values in key variables were removed. In addition, only observations with altitude between 0 and 3000 meters were retained, as extremely large altitude values are not plausible for coffee-growing regions. After cleaning, the number of observations was reduced from 1144 to 919.
+
+The dataset was refined by removing missing values and unrealistic outliers, applying a 3000m altitude threshold based on biological limits. The harvested variable and country_of_origin were excluded to eliminate climatic and geographical noise. Importantly, altitude was categorized into Low (\<1250m), Medium (1250-1500m), and High (\>1500m) based on domain literature. To facilitate modeling, altitude was categorized into three bins based on domain literature, and category_two_defects was log-transformed to stabilize its variance. This resulted in a robust and high-quality dataset ready for analysis.
+
 ```{r}
 nrow(coffee)
 nrow(coffee_clean)
 ```
 
+The original dataset had 1,145 rows. We removed 217 rows that contained duplicates, missing values, or obvious errors (such as unrealistic altitude). This leaves us with 927 high-quality rows, which is a very solid sample size for building our predictive model.
+
 # Exploratory Data Analysis
-## Distribution of quality class
+
+## Quality Class Proportion
+
 ```{r}
-coffee_clean %>%
+quality_stats <- coffee_clean %>%
   count(Qualityclass) %>%
-  ggplot(aes(x = Qualityclass, y = n, fill = Qualityclass)) +
-  geom_col() +
-  labs(
-    title = "Distribution of Coffee Quality Class",
-    x = "Quality Class",
-    y = "Count"
-  )
+  mutate(Percentage = round(n / sum(n) * 100, 1))
+print(quality_stats)
 ```
-This bar chart shows the number of coffee batches classified as Good and Poor. The two classes are relatively balanced, although the number of Good batches is slightly higher than the number of Poor batches. This suggests that class imbalance is unlikely to be a major issue in the later logistic GLM, since neither category overwhelmingly dominates the dataset.
 
-## Aroma by quality class
+The summary shows an almost perfectly balanced dataset, with approximately 50.9% of the coffees classified as "Good" and 49.1% as "Poor." This balance ensures that our subsequent logistic regression model will not suffer from bias toward a majority class.
+
+## Descriptive Statistics & Distribution Check
+
 ```{r}
-ggplot(coffee_clean, aes(x = aroma, fill = Qualityclass)) +
-  geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
-  labs(
-    title = "Distribution of Aroma Scores by Quality Class",
-    x = "Aroma Score",
-    y = "Frequency"
-  )
+library(gridExtra)
+# View summary statistics for key predictors
+summary(coffee_clean %>% select(aroma, flavor, acidity, log_defects))
+# Plot histograms to visualize the distribution shapes and long tails
+p1 <- ggplot(coffee_clean, aes(x = aroma)) + 
+  geom_histogram(fill="lightblue", color="white", bins=30) + 
+  theme_minimal() + labs(title="Aroma Distribution", x="Aroma", y="Count")
+p2 <- ggplot(coffee_clean, aes(x = flavor)) + 
+  geom_histogram(fill="lightgreen", color="white", bins=30) + 
+  theme_minimal() + labs(title="Flavor Distribution", x="Flavor", y="Count")
+p3 <- ggplot(coffee_clean, aes(x = acidity)) + 
+  geom_histogram(fill="lightpink", color="white", bins=30) + 
+  theme_minimal() + labs(title="Acidity Distribution", x="Acidity", y="Count")
+p4 <- ggplot(coffee_clean, aes(x = log_defects)) + 
+  geom_histogram(fill="orange", color="white", bins=30) + 
+  theme_minimal() + labs(title="Log(Defects+1) Distribution", x="Log(Defects+1)", y="Count")
+# Arrange all four plots in a 2x2 grid for better readability
+grid.arrange(p1, p2, p3, p4, ncol=2, nrow=2)
 ```
-This histogram compares aroma scores across the two quality classes. The distribution for Good coffee is shifted slightly to the right, indicating that Good batches tend to have somewhat higher aroma scores than Poor batches. Although the two distributions overlap considerably, aroma still appears to contain useful information for distinguishing between the two classes and is therefore a plausible predictor in the later GLM.
 
-## Flavor by quality class
-```{r}
-ggplot(coffee_clean, aes(x = flavor, fill = Qualityclass)) +
-  geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
-  labs(
-    title = "Distribution of Flavor Scores by Quality Class",
-    x = "Flavor Score",
-    y = "Frequency"
-  )
-```
-This plot compares flavor scores between Good and Poor coffee batches. Similar to aroma, the Good group appears to have a slightly higher concentration of observations at the upper end of the flavor scale. While there is substantial overlap between the two groups, the pattern suggests that higher flavor scores are associated with a greater probability of a batch being classified as Good, so flavor is likely to be an important explanatory variable.
+The histograms reveal that the sensory attributes (aroma, flavor, and acidity) roughly follow a normal distribution centered around 7.5, with a few natural extreme low scores acting as the left tail. For the defects variable, we applied a log(x+1) transformation to address its severe right-skewness. While the resulting log_defects distribution still has many zero values due to the high frequency of zero-defect batches, the transformation effectively compresses the long tail of outliers, making the data more stable for our modeling.
 
-## Acidity by quality class
-```{r}
-ggplot(coffee_clean, aes(x = acidity, fill = Qualityclass)) +
-  geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
-  labs(
-    title = "Distribution of Acidity Scores by Quality Class",
-    x = "Acidity Score",
-    y = "Frequency"
-  )
-```
-This histogram shows the distribution of acidity scores by quality class. The Good group appears to be centred at slightly higher acidity values, although the difference is less pronounced than for aroma or flavor. This suggests that acidity may still contribute to explaining coffee quality classification, but its effect may be weaker than some of the other sensory variables.
+## Altitude Category Distribution
 
-## Category two defects by quality class
+To ensure the reliability of our subsequent statistical modeling, it is essential to verify that our newly engineered `altitude_category` variable has sufficient observations within each group.
+
 ```{r}
-ggplot(coffee_clean, aes(x = Qualityclass, y = category_two_defects, fill = Qualityclass)) +
-  geom_boxplot() +
-  labs(
-    title = "Category Two Defects by Quality Class",
-    x = "Quality Class",
-    y = "Category Two Defects"
-  ) +
+# Calculate the count and percentage for each altitude category
+altitude_stats <- coffee_clean %>%
+  count(altitude_category) %>%
+  mutate(Percentage = round(n / sum(n) * 100, 1))
+print(altitude_stats)
+# Visualize the distribution of altitude categories
+ggplot(coffee_clean, aes(x = altitude_category, fill = altitude_category)) +
+  geom_bar() +
+  scale_fill_brewer(palette = "Blues") +
+  theme_minimal() +
+  labs(title = "Distribution of Coffee Batches by Altitude",
+       x = "Altitude Category",
+       y = "Number of Batches") +
   theme(legend.position = "none")
 ```
-This boxplot compares the distribution of category two defects between coffee batches classified as Good and Poor. The Poor group appears to have a slightly higher median number of defects and greater variability than the Good group. There are also more extreme values in the Poor group. This suggests that category two defects may be associated with coffee quality classification and should be considered as a candidate predictor in the later GLM.
 
-## Altitude and aroma
-```{r}
-ggplot(coffee_clean, aes(x = altitude_mean_meters, y = aroma, color = Qualityclass)) +
-  geom_point(alpha = 0.7) +
-  labs(
-    title = "Altitude and Aroma Score by Quality Class",
-    x = "Altitude (meters)",
-    y = "Aroma Score"
-  )
-```
-This scatterplot shows the relationship between altitude and aroma score, with points coloured by quality class. Most observations are concentrated within a similar altitude range, and the association between altitude and aroma does not appear strongly linear. However, Good batches tend to cluster at slightly higher aroma values across much of the altitude range. This suggests that altitude may provide some additional information, although its role is likely to be weaker and less direct than that of the sensory variables.
+The distribution table and bar chart show that our altitude_category is well-balanced across all three levels. Low altitude has the most observations (38.6%), followed by Medium (30.2%) and High (31.2%). This balanced distribution is crucial as it ensures our GLM model has enough data in each group to produce statistically significant results, rather than being biased by a single dominant category.
 
+## Correlation & Multicollinearity Check
 
-## Correlation analysis
+Before fitting our Generalized Linear Model (GLM), it is vital to check for potential multicollinearity among our continuous predictors. High correlation between independent variables can lead to unstable coefficient estimates. We visualize this using a correlation heatmap.
 
 ```{r}
-coffee_clean %>%
-  select(aroma, flavor, acidity, altitude_mean_meters, category_two_defects) %>%
-  cor(use = "complete.obs")
+library(corrplot)
+# Calculate the correlation matrix for continuous variables
+cor_matrix <- coffee_clean %>%
+  select(aroma, flavor, acidity, category_two_defects) %>%
+  cor()
+# Generate a professional correlation heatmap
+corrplot(cor_matrix, method = "color", type = "upper", addCoef.col = "black", 
+         tl.col = "black", tl.srt = 45, 
+         title = "Correlation Matrix of Numeric Predictors", mar = c(0,0,1,0))
 ```
-The correlation matrix summarises the relationships among the main numeric variables. Aroma, flavor and acidity are moderately to strongly positively correlated, which is expected because these sensory measures reflect related aspects of coffee quality. By contrast, altitude and category two defects show much weaker relationships with the sensory variables, suggesting that they may capture different dimensions of coffee production and quality. This is useful for the later GLM, as it indicates that some predictors may contain overlapping information while others may contribute more distinct explanatory value.
 
-Overall, the exploratory analysis suggests that sensory variables, particularly aroma, flavor and acidity, differ between coffee batches classified as Good and Poor. Among these, aroma and flavor appear to show the clearest separation, while acidity shows a weaker but still noticeable difference. In addition, higher defect counts are more common among Poor batches, and altitude may provide some additional contextual information even though its relationship with quality appears less direct. These findings suggest that both sensory and production-related variables should be considered in the later GLM modelling the probability that a coffee batch is classified as Good rather than Poor.
+The heatmap indicates strong positive correlations among the sensory attributes, particularly between flavor and acidity ($r \approx 0.75$), and aroma and flavor ($r \approx 0.73$). While expected in coffee cupping (coffees that smell good typically taste good), this high correlation serves as an early warning. It dictates that we must rigorously monitor Variance Inflation Factors (VIF) during the model diagnostic phase to ensure our model remains stable.
+
+## Exploring X vs Y Relationships
+
+Finally, we visually explore how our primary predictors relate to our target variable (Qualityclass) to confirm their predictive potential. We focus on our strongest continuous predictor (Flavor) and our newly engineered categorical predictor (Altitude Category).
+
+```{r}
+# Plot 1: Flavor distribution across Quality Classes
+p_flavor <- ggplot(coffee_clean, aes(x = Qualityclass, y = flavor, fill = Qualityclass)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("Good" = "#66c2a5", "Poor" = "#fc8d62")) +
+  labs(title = "Flavor vs Quality Class", x = "Quality Class", y = "Flavor Score") +
+  theme_minimal() +
+  theme(legend.position = "none")
+# Plot 2: Quality Class proportion stacked by Altitude Category
+p_altitude <- ggplot(coffee_clean, aes(x = altitude_category, fill = Qualityclass)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("Good" = "#66c2a5", "Poor" = "#fc8d62")) +
+  labs(title = "Proportion of Good/Poor Coffee by Altitude",
+       x = "Altitude Category", y = "Percentage") +
+  theme_minimal()
+p_flavor
+p_altitude
+```
+
+The visualizations confirm strong predictive associations. The boxplot demonstrates a stark distinction in flavor scores: batches classified as "Good" consistently score higher than "Poor" batches. Furthermore, the stacked bar chart reveals a striking linear trend regarding the growing environment: higher altitudes yield a significantly larger proportion of "Good" coffee (over 70% in the High category). These insights lay a robust foundation for our logistic regression modeling.
 
 # Modelling
 
