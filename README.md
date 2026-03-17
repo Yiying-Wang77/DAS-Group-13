@@ -25,7 +25,7 @@ What influence do different features of coffee have on whether the quality of a 
 3. Click **Render**
 
 ## Team & contributions
-- **Yiying Wang**: repository setup + files submmit + README maintenance
+- **Yiying Wang**: repository setup + files submit + README maintenance
 - **Jiani Wang**: data upload (`dataset13.csv`) + data cleaning + EDA plots + descriptive summaries
 - **Ricky Tong**: GLM modelling + interpretation of model fit
 - **Anqi Shen**: helping EDA and imterpretion part + presentation slides + final polishing
