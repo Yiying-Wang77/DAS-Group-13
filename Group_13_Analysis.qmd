@@ -24,6 +24,7 @@ coffee <- read_csv("data/dataset13.csv", show_col_types = FALSE)
 ```
 
 ```{r}
+
 glimpse(coffee)
 summary(coffee)
 colSums(is.na(coffee))
@@ -70,16 +71,16 @@ coffee_clean <- coffee %>%
 
 The dataset was refined by removing missing values and unrealistic outliers, applying a 3000m altitude threshold based on biological limits. The harvested variable and country_of_origin were excluded to eliminate climatic and geographical noise. Importantly, altitude was categorized into Low (\<1250m), Medium (1250-1500m), and High (\>1500m) based on domain literature. To facilitate modeling, altitude was categorized into three bins based on domain literature, and category_two_defects was log-transformed to stabilize its variance. This resulted in a robust and high-quality dataset ready for analysis.
 
+
 ```{r}
 nrow(coffee)
 nrow(coffee_clean)
 ```
-
 The original dataset had 1,145 rows. We removed 217 rows that contained duplicates, missing values, or obvious errors (such as unrealistic altitude). This leaves us with 927 high-quality rows, which is a very solid sample size for building our predictive model.
 
 # Exploratory Data Analysis
 
-## Quality Class Proportion
+## Distribution of quality class
 
 ```{r}
 quality_stats <- coffee_clean %>%
@@ -140,13 +141,13 @@ The distribution table and bar chart show that our altitude_category is well-bal
 
 ## Correlation & Multicollinearity Check
 
-Before fitting our Generalized Linear Model (GLM), it is vital to check for potential multicollinearity among our continuous predictors. High correlation between independent variables can lead to unstable coefficient estimates. We visualize this using a correlation heatmap.
+Before fitting our Generalized Linear Model (GLM), it is vital to check for potential multicollinearity among our continuous predictors. High correlation between independent variables can lead to unstable coefficient estimates. We visualize this using a correlation heatmap .
 
 ```{r}
 library(corrplot)
 # Calculate the correlation matrix for continuous variables
 cor_matrix <- coffee_clean %>%
-  select(aroma, flavor, acidity, category_two_defects) %>%
+  select(aroma, flavor, acidity, log_defects) %>%
   cor()
 # Generate a professional correlation heatmap
 corrplot(cor_matrix, method = "color", type = "upper", addCoef.col = "black", 
@@ -184,4 +185,163 @@ The visualizations confirm strong predictive associations. The boxplot demonstra
 
 # Modelling
 
+## Model Selection: Logistic Regression (GLM)
+
+To investigate the determinants of coffee quality, we fitted a binomial generalized linear model with a logit link, as the response variable Qualityclass is binary.
+
+## Data Partitioning
+
+The cleaned dataset was split into a 70% training set and a 30% hold-out test set using stratified sampling. This ensured that model fitting and final evaluation were conducted on separate data, providing a more credible assessment of out-of-sample performance. For interpretability, Qualityclass was coded with “Poor” as the reference level, and altitude_category was coded with “Low” as the reference level in models where altitude was included.
+
+```{r}
+# Split Training and Test Sets
+library(tidyverse)
+library(broom)
+library(car)
+library(pROC)
+
+set.seed(2026)
+
+coffee_clean <- coffee_clean %>%
+  mutate(
+    Qualityclass = factor(Qualityclass, levels = c("Poor", "Good")),
+    altitude_category = factor(altitude_category, levels = c("Low", "Medium", "High"))
+  )
+
+# Stratified sampling: 70% for training set, 30% for test set
+poor_index <- which(coffee_clean$Qualityclass == "Poor")
+good_index <- which(coffee_clean$Qualityclass == "Good")
+
+train_poor <- sample(poor_index, size = floor(0.7 * length(poor_index)))
+train_good <- sample(good_index, size = floor(0.7 * length(good_index)))
+
+train_index <- c(train_poor, train_good)
+
+train_data <- coffee_clean[train_index, ]
+test_data  <- coffee_clean[-train_index, ]
+
+# Check the class distribution in training and test sets
+prop.table(table(train_data$Qualityclass))
+prop.table(table(test_data$Qualityclass))
+```
+
+## Variable Selection
+
+We used a manual backward model simplification strategy to obtain a more parsimonious model. Starting from the full model, log_defects was removed because it was clearly non-significant and its exclusion did not worsen model fit. We then assessed whether altitude_category should be retained by comparing nested models using a likelihood ratio test and AIC. Since altitude did not make a statistically significant contribution and the AIC difference was negligible, the simpler model containing only aroma, flavor, and acidity was selected as the final model.
+
+```{r}
+# Fit Full Model
+model_full <- glm(
+  Qualityclass ~ aroma + flavor + acidity + log_defects + altitude_category,
+  data = train_data,
+  family = binomial(link = "logit")
+)
+
+summary(model_full)
+```
+
+```{r}
+# Remove the non-significant log_defects variable
+model_reduced1 <- glm(
+  Qualityclass ~ aroma + flavor + acidity + altitude_category,
+  data = train_data,
+  family = binomial(link = "logit")
+)
+
+summary(model_reduced1)
+```
+
+```{r}
+#compare full model with model_reduced1
+anova(model_reduced1, model_full, test = "Chisq")
+AIC(model_reduced1, model_full)
+```
+
+```{r}
+#check whether altitude_category should be retained as a whole
+model_reduced2 <- glm(
+  Qualityclass ~ aroma + flavor + acidity,
+  data = train_data,
+  family = binomial(link = "logit")
+)
+
+summary(model_reduced2)
+```
+
+```{r}
+# compare model_reduced1 with model_reduced2
+anova(model_reduced2, model_reduced1, test = "Chisq")
+AIC(model_reduced2, model_reduced1)
+```
+
+## Multicollinearity Check
+
+Because the sensory predictors were moderately correlated, multicollinearity was assessed using the Variance Inflation Factor (VIF). This diagnostic was included to ensure that overlap among predictors did not materially distort the coefficient estimates.
+
+```{r}
+library(car)
+
+vif(model_reduced2)
+```
+
+## Model Validation (ROC and AUC)
+
+The final model was evaluated on the hold-out test set using ROC analysis. The resulting AUC of 0.934 indicates excellent discriminatory ability, suggesting that the model performs very well in separating “Good” from “Poor” coffee batches on unseen data.
+
+```{r}
+# Predict on test set using the final model
+test_probs_final <- predict(model_reduced2, newdata = test_data, type = "response")
+
+# ROC and AUC (on test set)
+test_roc_final <- roc(
+  response = test_data$Qualityclass,
+  predictor = test_probs_final,
+  levels = c("Poor", "Good"),
+  direction = "<"
+)
+
+auc(test_roc_final)
+
+# Plot the ROC curve
+plot(
+  test_roc_final,
+  col = "red",
+  lwd = 2,
+  legacy.axes = TRUE,
+  main = paste("Test Set ROC Curve (AUC =", round(auc(test_roc_final), 3), ")")
+)
+abline(a = 0, b = 1, lty = 2, col = "gray")
+round(auc(test_roc_final), 3)
+```
+
+## Odds Ratio (OR) table
+
+While the ROC curve and AUC evaluate the predictive performance of the final model on unseen data, they do not show how individual predictors are associated with coffee quality classification. To address this, we report the Odds Ratios (ORs) for the final logistic regression model. In this context, each OR represents the multiplicative change in the odds of being classified as “Good” for a one-unit increase in the corresponding sensory score, conditional on the other predictors being held constant. The OR table therefore complements the ROC analysis by providing an interpretable summary of the contribution of aroma, flavor, and acidity.
+
+```{r}
+# Extract non-intercept terms
+coef_est <- coef(model_reduced2)[-1]
+or_est <- exp(coef_est)
+ci_or <- exp(confint(model_reduced2))[-1, ]
+p_vals <- summary(model_reduced2)$coefficients[-1, 4]
+
+# Odds Ratio (OR) table
+or_table <- data.frame(
+  Variable = names(coef_est),
+  Coefficient = round(coef_est, 3),
+  OR = round(or_est, 3),
+  CI_Lower = round(ci_or[, 1], 3),
+  CI_Upper = round(ci_or[, 2], 3),
+  p_value = round(p_vals, 4)
+)
+
+or_table
+```
+
 # Conclusion
+
+The results of this analysis suggest that the main factors influencing coffee quality classification in this dataset are sensory characteristics rather than production-related variables. In the final logistic regression model, aroma, flavor, and acidity were all positively associated with the odds of being classified as “Good”, with flavor showing the strongest effect among the retained predictors.
+
+Although altitude showed some association in the exploratory analysis, it did not provide substantial additional explanatory value once the sensory variables were included in the model. Similarly, the defect measure did not make a meaningful contribution after controlling for sensory scores. This suggests that final coffee quality classification is more closely related to overall cupping performance than to production conditions or minor physical defects alone.
+
+The final model also performed very well on the hold-out test set, achieving an AUC of 0.934. This indicates excellent ability to distinguish between “Good” and “Poor” coffee samples in unseen data. Overall, the findings suggest that sensory attributes are the most important predictors of coffee quality classification in this dataset, while altitude and defect measures play a more limited role once cupping characteristics are taken into account.
